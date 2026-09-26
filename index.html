@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>ISBN 本体価格カウンター</title>
 
   <style>
@@ -12,11 +13,13 @@
       margin: 0 auto;
       padding: 20px;
       background: #f7f7f7;
+      color: #333;
     }
 
     h1 {
       text-align: center;
       font-size: 24px;
+      margin-bottom: 20px;
     }
 
     .summary {
@@ -27,9 +30,16 @@
       text-align: center;
     }
 
+    .summary-title {
+      font-size: 14px;
+      color: #666;
+      margin-top: 10px;
+    }
+
     .number {
       font-size: 32px;
       font-weight: bold;
+      margin-bottom: 10px;
     }
 
     .input-area {
@@ -44,6 +54,8 @@
       padding: 12px;
       font-size: 18px;
       margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
     }
 
     button {
@@ -57,6 +69,16 @@
       cursor: pointer;
     }
 
+    button:disabled {
+      background: #aaa;
+    }
+
+    #message {
+      text-align: center;
+      margin-top: 15px;
+      min-height: 24px;
+    }
+
     #bookList {
       margin-top: 20px;
     }
@@ -67,6 +89,22 @@
       margin-bottom: 10px;
       border-radius: 8px;
     }
+
+    .book-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .book-info {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .book-price {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
   </style>
 </head>
 
@@ -75,14 +113,28 @@
   <h1>ISBN 本体価格カウンター</h1>
 
   <div class="summary">
-    <div>スキャン済み</div>
-    <div class="number" id="totalBooks">0冊</div>
 
-    <div>合計本体価格</div>
-    <div class="number" id="totalPrice">0円</div>
+    <div class="summary-title">
+      スキャン済み
+    </div>
+
+    <div class="number" id="totalBooks">
+      0冊
+    </div>
+
+    <div class="summary-title">
+      合計本体価格
+    </div>
+
+    <div class="number" id="totalPrice">
+      0円
+    </div>
+
   </div>
 
+
   <div class="input-area">
+
     <input
       type="text"
       id="isbnInput"
@@ -90,45 +142,282 @@
       inputmode="numeric"
     >
 
-    <button onclick="addBook()">本を追加</button>
+    <button id="addButton" onclick="addBook()">
+      本を追加
+    </button>
+
+    <div id="message"></div>
+
   </div>
+
 
   <div id="bookList"></div>
 
+
   <script>
+
     let totalBooks = 0;
     let totalPrice = 0;
 
-    function addBook() {
-      const isbn = document.getElementById("isbnInput").value.trim();
 
+    // ISBNを正規化する
+    function normalizeISBN(isbn) {
+
+      // ハイフンや空白を削除
+      isbn = isbn.replace(/[-\s]/g, "");
+
+      return isbn;
+    }
+
+
+    // ISBNから本の情報を取得
+    async function getBookInfo(isbn) {
+
+      const url =
+        "https://api.openbd.jp/v1/get?isbn=" +
+        encodeURIComponent(isbn);
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error("APIへの接続に失敗しました");
+      }
+
+      const data = await response.json();
+
+      // ISBNが存在しない場合
+      if (!data || !data[0]) {
+        return null;
+      }
+
+      const book = data[0];
+
+      let title = "書名不明";
+      let price = null;
+
+      // 書名
+      if (
+        book.summary &&
+        book.summary.title
+      ) {
+        title = book.summary.title;
+      }
+
+      // 価格
+      if (
+        book.onix &&
+        book.onix.ProductSupply &&
+        book.onix.ProductSupply.SupplyDetail &&
+        book.onix.ProductSupply.SupplyDetail.Price
+      ) {
+
+        const prices =
+          book.onix.ProductSupply.SupplyDetail.Price;
+
+        // 本体価格を探す
+        for (const priceData of prices) {
+
+          if (
+            priceData &&
+            priceData.PriceAmount
+          ) {
+
+            const amount =
+              Number(priceData.PriceAmount);
+
+            if (!isNaN(amount)) {
+              price = amount;
+              break;
+            }
+
+          }
+
+        }
+      }
+
+      return {
+        title: title,
+        price: price
+      };
+    }
+
+
+    // 本を追加
+    async function addBook() {
+
+      const input =
+        document.getElementById("isbnInput");
+
+      const button =
+        document.getElementById("addButton");
+
+      const message =
+        document.getElementById("message");
+
+      let isbn =
+        normalizeISBN(input.value.trim());
+
+
+      // ISBN未入力
       if (!isbn) {
-        alert("ISBNを入力してください");
+
+        message.textContent =
+          "ISBNを入力してください";
+
         return;
       }
 
-      // 今はテストとして1000円の本として追加
-      const price = 1000;
 
-      totalBooks++;
-      totalPrice += price;
+      // ISBN-10の場合はそのまま検索
+      if (
+        isbn.length !== 10 &&
+        isbn.length !== 13
+      ) {
 
-      document.getElementById("totalBooks").textContent =
-        totalBooks + "冊";
+        message.textContent =
+          "ISBNは10桁または13桁で入力してください";
 
-      document.getElementById("totalPrice").textContent =
-        totalPrice.toLocaleString() + "円";
+        return;
+      }
 
-      const book = document.createElement("div");
-      book.className = "book";
-      book.textContent =
-        "ISBN: " + isbn + " / 本体価格: " +
-        price.toLocaleString() + "円";
 
-      document.getElementById("bookList").appendChild(book);
+      // 検索中
+      button.disabled = true;
 
-      document.getElementById("isbnInput").value = "";
+      message.textContent =
+        "本を検索しています…";
+
+
+      try {
+
+        const book =
+          await getBookInfo(isbn);
+
+
+        // 本が見つからない
+        if (!book) {
+
+          message.textContent =
+            "このISBNの本が見つかりませんでした";
+
+          return;
+        }
+
+
+        // 価格が見つからない
+        if (book.price === null) {
+
+          message.textContent =
+            "本は見つかりましたが、価格情報がありません";
+
+          return;
+        }
+
+
+        // 合計に追加
+        totalBooks++;
+
+        totalPrice += book.price;
+
+
+        // 画面更新
+        document.getElementById("totalBooks")
+          .textContent =
+          totalBooks + "冊";
+
+        document.getElementById("totalPrice")
+          .textContent =
+          totalPrice.toLocaleString() + "円";
+
+
+        // 本の一覧に追加
+        const bookElement =
+          document.createElement("div");
+
+        bookElement.className = "book";
+
+
+        const titleElement =
+          document.createElement("div");
+
+        titleElement.className = "book-title";
+
+        titleElement.textContent =
+          book.title;
+
+
+        const infoElement =
+          document.createElement("div");
+
+        infoElement.className = "book-info";
+
+        infoElement.textContent =
+          "ISBN: " + isbn;
+
+
+        const priceElement =
+          document.createElement("div");
+
+        priceElement.className = "book-price";
+
+        priceElement.textContent =
+          "本体価格: " +
+          book.price.toLocaleString() +
+          "円";
+
+
+        bookElement.appendChild(
+          titleElement
+        );
+
+        bookElement.appendChild(
+          infoElement
+        );
+
+        bookElement.appendChild(
+          priceElement
+        );
+
+
+        document
+          .getElementById("bookList")
+          .appendChild(bookElement);
+
+
+        // 入力欄を空にする
+        input.value = "";
+
+        message.textContent =
+          "追加しました";
+
+
+      } catch (error) {
+
+        console.error(error);
+
+        message.textContent =
+          "本の情報を取得できませんでした";
+
+      } finally {
+
+        button.disabled = false;
+
+      }
+
     }
+
+
+    // Enterキーでも検索できる
+    document
+      .getElementById("isbnInput")
+      .addEventListener("keydown", function(event) {
+
+        if (event.key === "Enter") {
+          addBook();
+        }
+
+      });
+
   </script>
 
 </body>
