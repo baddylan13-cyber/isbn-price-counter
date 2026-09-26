@@ -6,6 +6,9 @@
 
   <title>ISBN 本体価格カウンター</title>
 
+  <!-- バーコードスキャン用ライブラリ -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
   <style>
     body {
       font-family: sans-serif;
@@ -42,6 +45,30 @@
       margin-bottom: 10px;
     }
 
+    /* スキャンエリア */
+    .scanner-area {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    #reader {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 10px;
+    }
+
+    .scan-button {
+      margin-top: 10px;
+      background: #333;
+    }
+
+    .stop-button {
+      margin-top: 10px;
+      background: #888;
+    }
+
     .input-area {
       background: white;
       padding: 20px;
@@ -64,7 +91,6 @@
       font-size: 18px;
       border: none;
       border-radius: 8px;
-      background: #333;
       color: white;
       cursor: pointer;
     }
@@ -112,6 +138,8 @@
 
   <h1>ISBN 本体価格カウンター</h1>
 
+
+  <!-- 合計 -->
   <div class="summary">
 
     <div class="summary-title">
@@ -133,17 +161,47 @@
   </div>
 
 
+  <!-- カメラ -->
+  <div class="scanner-area">
+
+    <div id="reader"></div>
+
+    <button
+      id="startButton"
+      class="scan-button"
+      onclick="startScanner()"
+    >
+      📷 カメラを起動
+    </button>
+
+    <button
+      id="stopButton"
+      class="stop-button"
+      onclick="stopScanner()"
+      style="display:none;"
+    >
+      カメラを停止
+    </button>
+
+  </div>
+
+
+  <!-- 手入力 -->
   <div class="input-area">
 
     <input
       type="text"
       id="isbnInput"
-      placeholder="ISBNを入力"
+      placeholder="ISBNを手入力"
       inputmode="numeric"
     >
 
-    <button id="addButton" onclick="addBook()">
-      本を追加
+    <button
+      id="addButton"
+      onclick="addBook()"
+      style="background:#333;"
+    >
+      ISBNから本を追加
     </button>
 
     <div id="message"></div>
@@ -151,6 +209,7 @@
   </div>
 
 
+  <!-- 本の一覧 -->
   <div id="bookList"></div>
 
 
@@ -159,51 +218,82 @@
     let totalBooks = 0;
     let totalPrice = 0;
 
+    let html5QrCode = null;
 
-    // ISBNを正規化する
+    // 連続読み取り防止
+    let isProcessingScan = false;
+
+
+    /*
+     * ISBNを正規化
+     */
     function normalizeISBN(isbn) {
 
-      // ハイフンや空白を削除
-      isbn = isbn.replace(/[-\s]/g, "");
+      return isbn
+        .replace(/[-\s]/g, "")
+        .trim();
 
-      return isbn;
     }
 
 
-    // ISBNから本の情報を取得
+    /*
+     * ISBNから本の情報を取得
+     */
     async function getBookInfo(isbn) {
 
       const url =
         "https://api.openbd.jp/v1/get?isbn=" +
         encodeURIComponent(isbn);
 
-      const response = await fetch(url);
+      const response =
+        await fetch(url);
 
       if (!response.ok) {
-        throw new Error("APIへの接続に失敗しました");
+
+        throw new Error(
+          "APIへの接続に失敗しました"
+        );
+
       }
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
-      // ISBNが存在しない場合
+
       if (!data || !data[0]) {
+
         return null;
+
       }
 
-      const book = data[0];
 
-      let title = "書名不明";
-      let price = null;
+      const book =
+        data[0];
 
-      // 書名
+      let title =
+        "書名不明";
+
+      let price =
+        null;
+
+
+      /*
+       * 書名
+       */
       if (
         book.summary &&
         book.summary.title
       ) {
-        title = book.summary.title;
+
+        title =
+          book.summary.title;
+
       }
 
-      // 価格
+
+      /*
+       * 価格
+       */
       if (
         book.onix &&
         book.onix.ProductSupply &&
@@ -212,10 +302,13 @@
       ) {
 
         const prices =
-          book.onix.ProductSupply.SupplyDetail.Price;
+          book.onix.ProductSupply
+            .SupplyDetail.Price;
 
-        // 本体価格を探す
-        for (const priceData of prices) {
+
+        for (
+          const priceData of prices
+        ) {
 
           if (
             priceData &&
@@ -223,52 +316,85 @@
           ) {
 
             const amount =
-              Number(priceData.PriceAmount);
+              Number(
+                priceData.PriceAmount
+              );
 
-            if (!isNaN(amount)) {
-              price = amount;
+
+            if (
+              !isNaN(amount)
+            ) {
+
+              price =
+                amount;
+
               break;
+
             }
 
           }
 
         }
+
       }
+
 
       return {
         title: title,
         price: price
       };
+
     }
 
 
-    // 本を追加
-    async function addBook() {
+    /*
+     * 本を追加
+     */
+    async function addBook(
+      isbnFromScanner = null
+    ) {
 
       const input =
-        document.getElementById("isbnInput");
+        document.getElementById(
+          "isbnInput"
+        );
 
       const button =
-        document.getElementById("addButton");
+        document.getElementById(
+          "addButton"
+        );
 
       const message =
-        document.getElementById("message");
+        document.getElementById(
+          "message"
+        );
 
-      let isbn =
-        normalizeISBN(input.value.trim());
 
+      /*
+       * スキャナーから来た場合
+       */
+      let isbn;
 
-      // ISBN未入力
-      if (!isbn) {
+      if (isbnFromScanner) {
 
-        message.textContent =
-          "ISBNを入力してください";
+        isbn =
+          normalizeISBN(
+            isbnFromScanner
+          );
 
-        return;
+      } else {
+
+        isbn =
+          normalizeISBN(
+            input.value
+          );
+
       }
 
 
-      // ISBN-10の場合はそのまま検索
+      /*
+       * ISBNチェック
+       */
       if (
         isbn.length !== 10 &&
         isbn.length !== 13
@@ -277,12 +403,14 @@
         message.textContent =
           "ISBNは10桁または13桁で入力してください";
 
-        return;
+        return false;
+
       }
 
 
-      // 検索中
-      button.disabled = true;
+      button.disabled =
+        true;
+
 
       message.textContent =
         "本を検索しています…";
@@ -291,79 +419,116 @@
       try {
 
         const book =
-          await getBookInfo(isbn);
+          await getBookInfo(
+            isbn
+          );
 
 
-        // 本が見つからない
+        /*
+         * 本が見つからない
+         */
         if (!book) {
 
           message.textContent =
             "このISBNの本が見つかりませんでした";
 
-          return;
+          return false;
+
         }
 
 
-        // 価格が見つからない
-        if (book.price === null) {
+        /*
+         * 価格がない
+         */
+        if (
+          book.price === null
+        ) {
 
           message.textContent =
             "本は見つかりましたが、価格情報がありません";
 
-          return;
+          return false;
+
         }
 
 
-        // 合計に追加
+        /*
+         * 合計に追加
+         */
         totalBooks++;
 
-        totalPrice += book.price;
+        totalPrice +=
+          book.price;
 
 
-        // 画面更新
-        document.getElementById("totalBooks")
+        /*
+         * 合計表示
+         */
+        document
+          .getElementById(
+            "totalBooks"
+          )
           .textContent =
           totalBooks + "冊";
 
-        document.getElementById("totalPrice")
+
+        document
+          .getElementById(
+            "totalPrice"
+          )
           .textContent =
-          totalPrice.toLocaleString() + "円";
+          totalPrice.toLocaleString()
+          + "円";
 
 
-        // 本の一覧に追加
+        /*
+         * 本の一覧
+         */
         const bookElement =
-          document.createElement("div");
+          document.createElement(
+            "div"
+          );
 
-        bookElement.className = "book";
+        bookElement.className =
+          "book";
 
 
         const titleElement =
-          document.createElement("div");
+          document.createElement(
+            "div"
+          );
 
-        titleElement.className = "book-title";
+        titleElement.className =
+          "book-title";
 
         titleElement.textContent =
           book.title;
 
 
         const infoElement =
-          document.createElement("div");
+          document.createElement(
+            "div"
+          );
 
-        infoElement.className = "book-info";
+        infoElement.className =
+          "book-info";
 
         infoElement.textContent =
           "ISBN: " + isbn;
 
 
         const priceElement =
-          document.createElement("div");
+          document.createElement(
+            "div"
+          );
 
-        priceElement.className = "book-price";
+        priceElement.className =
+          "book-price";
 
         priceElement.textContent =
           "本体価格: " +
-          book.price.toLocaleString() +
-          "円";
+          book.price.toLocaleString()
+          + "円";
 
 
         bookElement.appendChild(
@@ -380,43 +545,425 @@
 
 
         document
-          .getElementById("bookList")
-          .appendChild(bookElement);
+          .getElementById(
+            "bookList"
+          )
+          .appendChild(
+            bookElement
+          );
 
 
-        // 入力欄を空にする
+        /*
+         * 入力欄を空にする
+         */
         input.value = "";
+
 
         message.textContent =
           "追加しました";
 
 
+        /*
+         * 成功音
+         */
+        playBeep();
+
+
+        return true;
+
+
       } catch (error) {
 
-        console.error(error);
+        console.error(
+          error
+        );
 
         message.textContent =
           "本の情報を取得できませんでした";
 
+        return false;
+
+
       } finally {
 
-        button.disabled = false;
+        button.disabled =
+          false;
 
       }
 
     }
 
 
-    // Enterキーでも検索できる
-    document
-      .getElementById("isbnInput")
-      .addEventListener("keydown", function(event) {
+    /*
+     * カメラ起動
+     */
+    async function startScanner() {
 
-        if (event.key === "Enter") {
-          addBook();
+      const message =
+        document.getElementById(
+          "message"
+        );
+
+
+      try {
+
+        if (!html5QrCode) {
+
+          html5QrCode =
+            new Html5Qrcode(
+              "reader"
+            );
+
         }
 
-      });
+
+        /*
+         * ISBNはEAN-13なので
+         * EAN-13だけを読む
+         */
+        const config = {
+
+          fps: 15,
+
+          qrbox: {
+            width: 300,
+            height: 120
+          },
+
+          aspectRatio: 1.7777778,
+
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13
+          ]
+
+        };
+
+
+        /*
+         * 背面カメラを使用
+         */
+        await html5QrCode.start(
+
+          {
+            facingMode: "environment"
+          },
+
+          config,
+
+          async function (
+            decodedText,
+            decodedResult
+          ) {
+
+            /*
+             * 連続検出による二重登録防止
+             */
+            if (
+              isProcessingScan
+            ) {
+
+              return;
+
+            }
+
+
+            /*
+             * 数字だけにする
+             */
+            const isbn =
+              normalizeISBN(
+                decodedText
+              );
+
+
+            /*
+             * EAN-13以外は無視
+             */
+            if (
+              !/^\d{13}$/.test(
+                isbn
+              )
+            ) {
+
+              return;
+
+            }
+
+
+            /*
+             * ISBN-13以外を無視
+             *
+             * 日本の書籍ISBNは
+             * 978 / 979 から始まる
+             */
+            if (
+              !isbn.startsWith("978") &&
+              !isbn.startsWith("979")
+            ) {
+
+              return;
+
+            }
+
+
+            isProcessingScan =
+              true;
+
+
+            /*
+             * 一度カメラを止める
+             *
+             * 本の検索中に同じ本を
+             * 何度も読み取らないため
+             */
+            await stopScanner();
+
+
+            /*
+             * ISBNを入力欄にも表示
+             */
+            document
+              .getElementById(
+                "isbnInput"
+              )
+              .value =
+              isbn;
+
+
+            /*
+             * 本を追加
+             */
+            await addBook(
+              isbn
+            );
+
+
+            /*
+             * 少し待ってから
+             * 再びスキャン可能にする
+             */
+            setTimeout(
+              async function () {
+
+                isProcessingScan =
+                  false;
+
+                await startScanner();
+
+              },
+              500
+            );
+
+          },
+
+          function (
+            errorMessage
+          ) {
+
+            /*
+             * 読み取り失敗は無視。
+             *
+             * カメラを動かしている間は
+             * 毎フレームここに来るため、
+             * 画面には表示しない。
+             */
+
+          }
+
+        );
+
+
+        document
+          .getElementById(
+            "startButton"
+          )
+          .style.display =
+          "none";
+
+
+        document
+          .getElementById(
+            "stopButton"
+          )
+          .style.display =
+          "block";
+
+
+        message.textContent =
+          "バーコードをカメラに映してください";
+
+
+      } catch (error) {
+
+        console.error(
+          error
+        );
+
+        message.textContent =
+          "カメラを起動できませんでした。カメラの使用を許可してください。";
+
+      }
+
+    }
+
+
+    /*
+     * カメラ停止
+     */
+    async function stopScanner() {
+
+      if (
+        html5QrCode
+      ) {
+
+        try {
+
+          await html5QrCode.stop();
+
+        } catch (error) {
+
+          console.log(
+            "カメラ停止:",
+            error
+          );
+
+        }
+
+      }
+
+
+      document
+        .getElementById(
+          "startButton"
+        )
+        .style.display =
+        "block";
+
+
+      document
+        .getElementById(
+          "stopButton"
+        )
+        .style.display =
+        "none";
+
+    }
+
+
+    /*
+     * スキャン成功音
+     *
+     * iPhoneのブラウザでは
+     * ユーザー操作後のAudioContextが
+     * 必要になる場合がある。
+     */
+    let audioContext = null;
+
+
+    function playBeep() {
+
+      try {
+
+        if (!audioContext) {
+
+          audioContext =
+            new (
+              window.AudioContext ||
+              window.webkitAudioContext
+            )();
+
+        }
+
+
+        if (
+          audioContext.state ===
+          "suspended"
+        ) {
+
+          audioContext.resume();
+
+        }
+
+
+        const oscillator =
+          audioContext.createOscillator();
+
+        const gain =
+          audioContext.createGain();
+
+
+        oscillator.type =
+          "sine";
+
+        oscillator.frequency.value =
+          880;
+
+
+        gain.gain.setValueAtTime(
+          0.001,
+          audioContext.currentTime
+        );
+
+        gain.gain.exponentialRampToValueAtTime(
+          0.15,
+          audioContext.currentTime + 0.01
+        );
+
+        gain.gain.exponentialRampToValueAtTime(
+          0.001,
+          audioContext.currentTime + 0.12
+        );
+
+
+        oscillator.connect(
+          gain
+        );
+
+        gain.connect(
+          audioContext.destination
+        );
+
+
+        oscillator.start();
+
+        oscillator.stop(
+          audioContext.currentTime + 0.12
+        );
+
+
+      } catch (error) {
+
+        console.log(
+          "音声再生:",
+          error
+        );
+
+      }
+
+    }
+
+
+    /*
+     * Enterキーで手入力検索
+     */
+    document
+      .getElementById(
+        "isbnInput"
+      )
+      .addEventListener(
+        "keydown",
+        function(event) {
+
+          if (
+            event.key === "Enter"
+          ) {
+
+            addBook();
+
+          }
+
+        }
+      );
 
   </script>
 
