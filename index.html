@@ -6,11 +6,9 @@
 
   <title>ISBN 本体価格カウンター</title>
 
-  <!-- Tesseract.js -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
-
     * {
       box-sizing: border-box;
     }
@@ -21,11 +19,9 @@
         BlinkMacSystemFont,
         "Helvetica Neue",
         sans-serif;
-
       max-width: 700px;
       margin: 0 auto;
       padding: 20px;
-
       background: #f5f5f5;
       color: #222;
     }
@@ -92,34 +88,23 @@
       height: auto;
     }
 
-    /*
-      ISBNを合わせる場所
-    */
-
     #scanGuide {
       position: absolute;
-
       left: 5%;
       right: 5%;
-
       top: 35%;
       height: 30%;
-
       border: 3px solid #00e676;
       border-radius: 10px;
-
       pointer-events: none;
     }
 
     #scanGuide::after {
-      content:
-        "ISBNの数字をここに合わせる";
+      content: "ISBNの数字をここに合わせてください";
 
       position: absolute;
-
       left: 0;
       right: 0;
-
       bottom: -38px;
 
       text-align: center;
@@ -128,7 +113,6 @@
       background: rgba(0,0,0,0.7);
 
       padding: 6px;
-
       font-size: 13px;
     }
 
@@ -147,22 +131,44 @@
       border: 1px solid #ddd;
     }
 
+    .debug-box {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f1f1f1;
+    }
+
+    .debug-title {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    #ocrResult {
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-family: monospace;
+      font-size: 16px;
+      min-height: 24px;
+    }
+
+    #detectedISBN {
+      font-weight: bold;
+      font-size: 18px;
+      color: #007a4d;
+      min-height: 24px;
+    }
+
     button {
       width: 100%;
-
       padding: 14px;
-
       border: none;
       border-radius: 8px;
-
       background: #007aff;
       color: white;
-
       font-size: 17px;
       font-weight: bold;
-
       cursor: pointer;
-
       margin-top: 10px;
     }
 
@@ -170,23 +176,22 @@
       background: #aaa;
     }
 
+    #scanButton {
+      background: #00a86b;
+    }
+
     #stopCamera {
       background: #666;
     }
 
-    #scanButton {
-      background: #00a86b;
-      font-size: 18px;
-      padding: 16px;
+    #resetButton {
+      background: #d9534f;
     }
 
     #status {
       text-align: center;
-
       min-height: 24px;
-
       margin: 14px 0;
-
       font-size: 14px;
       color: #555;
     }
@@ -199,11 +204,8 @@
     .manual-row input {
       flex: 1;
       min-width: 0;
-
       padding: 12px;
-
       font-size: 16px;
-
       border: 1px solid #ccc;
       border-radius: 8px;
     }
@@ -240,13 +242,10 @@
 
     .note {
       margin-top: 12px;
-
       font-size: 13px;
       line-height: 1.6;
-
       color: #666;
     }
-
   </style>
 </head>
 
@@ -256,9 +255,7 @@
   <h1>ISBN 本体価格カウンター</h1>
 
 
-  <!-- ======================
-       集計
-  ======================= -->
+  <!-- 集計 -->
 
   <div class="summary">
 
@@ -303,9 +300,7 @@
   </div>
 
 
-  <!-- ======================
-       カメラ
-  ======================= -->
+  <!-- カメラ -->
 
   <div class="section">
 
@@ -340,7 +335,7 @@
           margin-bottom:5px;
         "
       >
-        OCRに使用した画像
+        OCRに実際に渡した画像
       </div>
 
       <img
@@ -356,9 +351,7 @@
     </div>
 
 
-    <button
-      id="startCamera"
-    >
+    <button id="startCamera">
       📷 カメラを起動
     </button>
 
@@ -379,13 +372,40 @@
     </button>
 
 
+    <!-- デバッグ情報 -->
+
+    <div class="debug-box">
+
+      <div class="debug-title">
+        OCRが実際に認識した文字
+      </div>
+
+      <div id="ocrResult">
+        まだ読み取っていません
+      </div>
+
+    </div>
+
+
+    <div class="debug-box">
+
+      <div class="debug-title">
+        ISBNとして抽出した結果
+      </div>
+
+      <div id="detectedISBN">
+        まだありません
+      </div>
+
+    </div>
+
+
     <div class="note">
 
-      バーコードそのものではなく、
-      <b>バーコードの下に印刷されているISBNの数字</b>
-      を緑の枠に合わせてください。<br>
+      今は原因調査のため、
+      OCRが実際に何を読み取ったか表示しています。<br>
 
-      数字を枠に合わせたら
+      ISBNの数字を緑の枠に合わせてから
       「この画像を読み取る」を押してください。
 
     </div>
@@ -393,9 +413,7 @@
   </div>
 
 
-  <!-- ======================
-       手入力
-  ======================= -->
+  <!-- 手入力 -->
 
   <div class="section">
 
@@ -421,9 +439,7 @@
   </div>
 
 
-  <!-- ======================
-       本一覧
-  ======================= -->
+  <!-- 本一覧 -->
 
   <div class="section">
 
@@ -436,6 +452,17 @@
   </div>
 
 
+  <!-- リセット -->
+
+  <div class="section">
+
+    <button id="resetButton">
+      🔄 すべてリセット
+    </button>
+
+  </div>
+
+
 <script>
 
 
@@ -444,6 +471,7 @@
   ========================= */
 
   let totalBooks = 0;
+
   let totalPrice = 0;
 
   let stream = null;
@@ -477,6 +505,12 @@
   const statusText =
     document.getElementById("status");
 
+  const ocrResult =
+    document.getElementById("ocrResult");
+
+  const detectedISBN =
+    document.getElementById("detectedISBN");
+
   const startButton =
     document.getElementById("startCamera");
 
@@ -485,6 +519,9 @@
 
   const stopButton =
     document.getElementById("stopCamera");
+
+  const resetButton =
+    document.getElementById("resetButton");
 
   const isbnInput =
     document.getElementById("isbnInput");
@@ -601,21 +638,8 @@
     }
 
 
-    console.log(
-      "OCR結果:",
-      text
-    );
-
-
     /*
-      OCRでは
-
-      978-4-...
-      978 4 ...
-      9784...
-
-      など色々な形になるため、
-      まず数字以外を除去。
+      まず全部数字にする
     */
 
     const digits =
@@ -623,7 +647,7 @@
 
 
     /*
-      連続した13桁から探す
+      13桁の連続数字
     */
 
     for (
@@ -650,8 +674,7 @@
 
 
     /*
-      OCRが空白やハイフンを
-      含んだ状態で返した場合
+      OCRがハイフンや空白を含む場合
     */
 
     const matches =
@@ -931,7 +954,7 @@
 
 
       statusText.textContent =
-        "読み取り成功！ 次の本をどうぞ";
+        "✓ 登録完了！";
 
 
       return true;
@@ -973,7 +996,7 @@
 
 
     statusText.textContent =
-      "最初の1回だけOCRエンジンを準備します…";
+      "OCRエンジンを準備しています…";
 
 
     try {
@@ -984,25 +1007,13 @@
         );
 
 
-      /*
-        ISBNなので数字だけに限定。
-      */
-
       await ocrWorker.setParameters({
 
         tessedit_char_whitelist:
           "0123456789-",
 
-        /*
-          1行の数字として読む
-        */
-
         tessedit_pageseg_mode:
           "7",
-
-        /*
-          解像度を指定
-        */
 
         user_defined_dpi:
           "300"
@@ -1022,9 +1033,6 @@
         "OCR初期化エラー",
         error
       );
-
-      statusText.textContent =
-        "OCRエンジンの準備に失敗しました";
 
       throw error;
 
@@ -1094,6 +1102,7 @@
       statusText.textContent =
         "ISBNの数字を緑の枠に合わせてください";
 
+
     } catch (error) {
 
       console.error(
@@ -1156,7 +1165,7 @@
 
 
   /* =========================
-     撮影
+     撮影画像作成
   ========================= */
 
   function captureImage() {
@@ -1173,14 +1182,6 @@
     }
 
 
-    /*
-      カメラ映像の
-      「緑の枠」に対応する部分だけ
-      切り出す。
-
-      実際の映像は横幅いっぱい。
-    */
-
     const sourceWidth =
       video.videoWidth;
 
@@ -1189,13 +1190,7 @@
 
 
     /*
-      枠の位置
-
-      左 5%
-      幅 90%
-
-      上 35%
-      高さ 30%
+      現在の緑枠に対応する範囲
     */
 
     const cropX =
@@ -1212,14 +1207,10 @@
 
 
     /*
-      OCR用に2倍程度へ拡大。
-
-      Tesseract.js公式でも
-      高解像度化・アップスケールで
-      認識率が改善する場合がある。
+      OCR用に3倍へ拡大
     */
 
-    const scale = 2;
+    const scale = 3;
 
 
     canvas.width =
@@ -1234,8 +1225,15 @@
 
 
     /*
-      少しだけ画質を強調
+      高品質補間
     */
+
+    ctx.imageSmoothingEnabled =
+      true;
+
+    ctx.imageSmoothingQuality =
+      "high";
+
 
     ctx.filter =
       "contrast(1.35) brightness(1.05)";
@@ -1263,7 +1261,7 @@
 
 
     /*
-      プレビュー表示
+      画面に実際のOCR画像を表示
     */
 
     preview.src =
@@ -1304,6 +1302,17 @@
       true;
 
 
+    /*
+      前回結果をクリア
+    */
+
+    ocrResult.textContent =
+      "読み取り中…";
+
+    detectedISBN.textContent =
+      "読み取り中…";
+
+
     try {
 
       statusText.textContent =
@@ -1311,14 +1320,14 @@
 
 
       /*
-        カメラが完全に映ってから撮影
+        少し待ってから撮影
       */
 
       await new Promise(
         resolve =>
           setTimeout(
             resolve,
-            200
+            300
           )
       );
 
@@ -1328,16 +1337,8 @@
 
 
       statusText.textContent =
-        "ISBNを読み取っています…";
+        "OCRで文字を読み取っています…";
 
-
-      /*
-        緑枠部分だけをOCR。
-
-        rectangleを使わず、
-        すでに切り出した画像を
-        そのまま渡す。
-      */
 
       const result =
         await ocrWorker.recognize(
@@ -1350,63 +1351,71 @@
         "";
 
 
+      /*
+        ★ここが今回一番重要
+        OCRが実際に返した文字列を表示
+      */
+
+      if (text.trim()) {
+
+        ocrResult.textContent =
+          text;
+
+      } else {
+
+        ocrResult.textContent =
+          "【OCR結果なし】";
+
+      }
+
+
       console.log(
         "OCR結果:",
         text
       );
 
 
+      /*
+        ISBN抽出
+      */
+
       const isbn =
         findISBN(text);
 
 
-      if (!isbn) {
+      if (isbn) {
+
+        detectedISBN.textContent =
+          isbn;
+
+        statusText.textContent =
+          "ISBNを認識しました！";
+
+
+        /*
+          openBDへ
+        */
+
+        await addBook(isbn);
+
+
+      } else {
+
+        detectedISBN.textContent =
+          "ISBNとして認識できませんでした";
+
 
         statusText.textContent =
           "ISBNを読み取れませんでした";
 
 
-        alert(
-          "ISBNを読み取れませんでした。\n\n" +
-          "・数字を緑の枠いっぱいに大きく映す\n" +
-          "・ピントが合うまで少し待つ\n" +
-          "・明るい場所で試す\n\n" +
-          "を試してみてください。"
-        );
-
-
-        return;
-
-      }
-
-
-      statusText.textContent =
-        "ISBN " +
-        isbn +
-        " を認識しました！";
-
-
-      /*
-        openBDへ問い合わせ
-      */
-
-      const success =
-        await addBook(isbn);
-
-
-      if (success) {
-
         /*
-          次の本のために
-          プレビューはそのまま残す。
-
-          次に撮影すると上書きされる。
+          今回は原因調査なので
+          alertではなく画面に結果を残す。
         */
 
-        statusText.textContent =
-          "✓ 登録完了！ 次の本をどうぞ";
-
       }
+
 
     } catch (error) {
 
@@ -1416,23 +1425,22 @@
       );
 
 
+      ocrResult.textContent =
+        "OCRエラー: " +
+        error.message;
+
+
+      detectedISBN.textContent =
+        "エラー";
+
+
       statusText.textContent =
         "読み取り中にエラーが発生しました";
 
 
-      alert(
-        "読み取り中にエラーが発生しました。\n\n" +
-        error.message
-      );
-
     } finally {
 
       processing = false;
-
-      /*
-        カメラが起動中なら
-        再び撮影可能にする
-      */
 
       if (stream) {
 
@@ -1442,6 +1450,75 @@
       }
 
     }
+
+  }
+
+
+  /* =========================
+     リセット
+  ========================= */
+
+  function resetAll() {
+
+    const confirmed =
+      confirm(
+        "読み取った本をすべて削除して、\n" +
+        "冊数と本体価格を0に戻しますか？"
+      );
+
+
+    if (!confirmed) {
+      return;
+    }
+
+
+    totalBooks = 0;
+
+    totalPrice = 0;
+
+
+    document.getElementById(
+      "totalBooks"
+    ).textContent =
+      "0";
+
+
+    document.getElementById(
+      "totalPrice"
+    ).textContent =
+      "0";
+
+
+    document.getElementById(
+      "bookList"
+    ).innerHTML =
+      "";
+
+
+    ocrResult.textContent =
+      "まだ読み取っていません";
+
+
+    detectedISBN.textContent =
+      "まだありません";
+
+
+    previewArea.style.display =
+      "none";
+
+
+    preview.src =
+      "";
+
+
+    statusText.textContent =
+      stream
+        ? "次の本を読み取れます"
+        : "「カメラを起動」を押してください";
+
+
+    isbnInput.value =
+      "";
 
   }
 
@@ -1502,16 +1579,11 @@
     "click",
     async () => {
 
-      /*
-        OCRエンジンは
-        カメラを使う最初のタイミングで準備。
-
-        カメラ起動と同時に準備して、
-        「読み取り」ボタンを押す頃には
-        準備が終わっている状態を狙う。
-      */
-
       startCamera();
+
+      /*
+        OCR準備も並行して開始
+      */
 
       initializeOCR()
         .catch(
@@ -1537,8 +1609,14 @@
   );
 
 
+  resetButton.addEventListener(
+    "click",
+    resetAll
+  );
+
+
   /* =========================
-     ページを離れる
+     ページ終了
   ========================= */
 
   window.addEventListener(
@@ -1563,7 +1641,6 @@
 
     }
   );
-
 
 </script>
 
